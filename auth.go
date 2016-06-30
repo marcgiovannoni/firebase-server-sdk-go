@@ -1,6 +1,13 @@
 package firebase
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/jwt"
+)
 
 var authInstances = struct {
 	sync.Mutex
@@ -18,6 +25,7 @@ var authInstances = struct {
 // particular authentication UID.
 type Auth struct {
 	app *App
+	ts  oauth2.TokenSource
 }
 
 // GetAuth gets the Auth instance for the default App.
@@ -73,4 +81,49 @@ func (a *Auth) VerifyIDToken(tokenString string) (*Token, error) {
 	}
 	projectID := a.app.options.ServiceAccountCredential.ProjectID
 	return verify(projectID, tokenString)
+}
+
+// GetAccessToken retrieves an oauth2 token to access Firebase services.
+//
+// The backend server can make authentication calls to the Firebase
+// Realtime Database REST API by passing with an access token.
+func (a *Auth) GetAccessToken() (string, error) {
+	if err := a.ensureTokenSource(); err != nil {
+		return "", fmt.Errorf("Setup token source failed: %v", err)
+	}
+	t, err := a.ts.Token()
+	if err != nil {
+		return "", err
+	}
+	return t.AccessToken, nil
+}
+
+const (
+	// jwtTokenURL is Google's OAuth 2.0 token URL to use with the JWT flow.
+	jwtTokenURL = "https://accounts.google.com/o/oauth2/token"
+)
+
+var (
+	scopes = []string{
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/firebase.database",
+	}
+)
+
+func (a *Auth) ensureTokenSource() error {
+	if a.ts != nil {
+		return nil
+	}
+	if err := a.app.options.ensureServiceAccount(); err != nil {
+		return err
+	}
+	c := a.app.options.ServiceAccountCredential
+	cfg := &jwt.Config{
+		Email:      c.ClientEmail,
+		PrivateKey: []byte(c.PrivateKeyString),
+		Scopes:     append([]string{}, scopes...),
+		TokenURL:   jwtTokenURL,
+	}
+	a.ts = cfg.TokenSource(context.TODO())
+	return nil
 }

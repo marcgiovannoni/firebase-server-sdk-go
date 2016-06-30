@@ -14,6 +14,8 @@ type GoogleServiceAccountCredential struct {
 	ProjectID string
 	// PrivateKey is the RSA256 private key.
 	PrivateKey *rsa.PrivateKey
+	// PrivateKeyString is the private key represented in string.
+	PrivateKeyString string
 	// ClientEmail is the client email.
 	ClientEmail string
 }
@@ -38,6 +40,7 @@ func (c *GoogleServiceAccountCredential) UnmarshalJSON(data []byte) error {
 
 	c.ProjectID = aux.ProjectID
 	c.ClientEmail = aux.ClientEmail
+	c.PrivateKeyString = aux.PrivateKey
 	return nil
 }
 
