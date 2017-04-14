@@ -3,6 +3,8 @@ package firebase
 import (
 	"net/http"
 	"sync"
+
+	"golang.org/x/oauth2"
 )
 
 var authInstances = struct {
@@ -21,6 +23,7 @@ var authInstances = struct {
 // particular authentication UID.
 type Auth struct {
 	app *App
+	ts  oauth2.TokenSource
 }
 
 // GetAuth gets the Auth instance for the default App.
@@ -84,4 +87,60 @@ func (a *Auth) VerifyIDTokenWithTransport(tokenString string, transport http.Rou
 	}
 	projectID := a.app.options.ServiceAccountCredential.ProjectID
 	return verify(projectID, tokenString, transport)
+}
+
+// GetUser looks up the user identified by the provided user id and
+// returns a user record for the given user if that user is found.
+func (auth *Auth) GetUser(uid string) (*UserRecord, error) {
+	if err := ensureTokenSource(auth); err != nil {
+		return nil, err
+	}
+	handler := &requestHandler{ts: auth.ts}
+	return handler.getAccountByUID(uid)
+}
+
+// GetUserByEmail looks up the user identified by the provided email and
+// returns a user record for the given user if that user is found.
+func (auth *Auth) GetUserByEmail(email string) (*UserRecord, error) {
+	if err := ensureTokenSource(auth); err != nil {
+		return nil, err
+	}
+	handler := &requestHandler{ts: auth.ts}
+	return handler.getAccountByEmail(email)
+}
+
+// CreateUser creates a new user with the properties provided.
+func (auth *Auth) CreateUser(properties UserProperties) (*UserRecord, error) {
+	if err := ensureTokenSource(auth); err != nil {
+		return nil, err
+	}
+	handler := &requestHandler{ts: auth.ts}
+	uid, err := handler.createNewAccount(properties)
+	if err != nil {
+		return nil, err
+	}
+	return handler.getAccountByUID(uid)
+}
+
+// DeleteUser deletes the user identified by the provided user id and returns
+// nil error when the user is found and successfully deleted.
+func (auth *Auth) DeleteUser(uid string) error {
+	if err := ensureTokenSource(auth); err != nil {
+		return err
+	}
+	handler := &requestHandler{ts: auth.ts}
+	return handler.deleteAccount(uid)
+}
+
+// UpdateUser updates an existing user with the properties provided.
+func (auth *Auth) UpdateUser(uid string, properties UserProperties) (*UserRecord, error) {
+	if err := ensureTokenSource(auth); err != nil {
+		return nil, err
+	}
+	handler := &requestHandler{ts: auth.ts}
+	uid, err := handler.updateExistingAccount(uid, properties)
+	if err != nil {
+		return nil, err
+	}
+	return handler.getAccountByUID(uid)
 }
