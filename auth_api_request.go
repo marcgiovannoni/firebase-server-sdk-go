@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"time"
 
+	"google.golang.org/appengine/urlfetch"
+
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
 	"golang.org/x/oauth2"
@@ -148,7 +150,7 @@ type providerInfo struct {
 	PhotoURL    string `json:"photoUrl"`
 }
 
-func (h *requestHandler) getAccountByUID(uid string) (*UserRecord, error) {
+func (h *requestHandler) getAccountByUID(ctx context.Context, uid string) (*UserRecord, error) {
 	if !isValidUID(uid) {
 		return nil, AuthErrInvalidUID
 	}
@@ -156,13 +158,13 @@ func (h *requestHandler) getAccountByUID(uid string) (*UserRecord, error) {
 		LocalID: []string{uid},
 	}
 	resp := new(getAccountInfoResponse)
-	if err := h.call(getAccountInfoAPI, req, resp); err != nil {
+	if err := h.call(ctx, getAccountInfoAPI, req, resp); err != nil {
 		return nil, err
 	}
 	return newUserRecord(resp.Users[0])
 }
 
-func (h *requestHandler) getAccountByEmail(email string) (*UserRecord, error) {
+func (h *requestHandler) getAccountByEmail(ctx context.Context, email string) (*UserRecord, error) {
 	if !isValidEmail(email) {
 		return nil, AuthErrInvalidEmail
 	}
@@ -170,7 +172,7 @@ func (h *requestHandler) getAccountByEmail(email string) (*UserRecord, error) {
 		Email: []string{email},
 	}
 	resp := new(getAccountInfoResponse)
-	if err := h.call(getAccountInfoAPI, req, resp); err != nil {
+	if err := h.call(ctx, getAccountInfoAPI, req, resp); err != nil {
 		return nil, err
 	}
 	return newUserRecord(resp.Users[0])
@@ -217,14 +219,14 @@ type deleteAccountRequest struct {
 	LocalID string `json:"localId,omitempty"`
 }
 
-func (h *requestHandler) deleteAccount(uid string) error {
+func (h *requestHandler) deleteAccount(ctx context.Context, uid string) error {
 	if !isValidUID(uid) {
 		return AuthErrInvalidUID
 	}
 	req := &deleteAccountRequest{
 		LocalID: uid,
 	}
-	if err := h.call(deleteAccountAPI, req, &struct{}{}); err != nil {
+	if err := h.call(ctx, deleteAccountAPI, req, &struct{}{}); err != nil {
 		return err
 	}
 	return nil
@@ -245,7 +247,7 @@ type createEditAccountResponse struct {
 	LocalID string `json:"localId"`
 }
 
-func (h *requestHandler) updateExistingAccount(uid string, properties UserProperties) (string, error) {
+func (h *requestHandler) updateExistingAccount(ctx context.Context, uid string, properties UserProperties) (string, error) {
 	if !isValidUID(uid) {
 		return "", AuthErrInvalidUID
 	} else if properties == nil {
@@ -275,13 +277,13 @@ func (h *requestHandler) updateExistingAccount(uid string, properties UserProper
 		delete(req, "disabled")
 	}
 	resp := new(createEditAccountResponse)
-	if err := h.call(setAccountAPI, req, resp); err != nil {
+	if err := h.call(ctx, setAccountAPI, req, resp); err != nil {
 		return "", err
 	}
 	return resp.LocalID, nil
 }
 
-func (h *requestHandler) createNewAccount(properties UserProperties) (string, error) {
+func (h *requestHandler) createNewAccount(ctx context.Context, properties UserProperties) (string, error) {
 	if properties == nil {
 		return "", errNullUserProperty
 	}
@@ -298,7 +300,7 @@ func (h *requestHandler) createNewAccount(properties UserProperties) (string, er
 		delete(req, "uid")
 	}
 	resp := new(createEditAccountResponse)
-	if err := h.call(signUpNewUserAPI, req, resp); err != nil {
+	if err := h.call(ctx, signUpNewUserAPI, req, resp); err != nil {
 		return "", err
 	}
 	return resp.LocalID, nil
@@ -371,7 +373,7 @@ func loadHTTPResponse(resp *http.Response, dst interface{}) error {
 	return nil
 }
 
-func (h *requestHandler) call(api *apiSettings, src, dst interface{}) error {
+func (h *requestHandler) call(ctx context.Context, api *apiSettings, src, dst interface{}) error {
 	if api.reqFn != nil {
 		if err := api.reqFn(src); err != nil {
 			return err
@@ -382,10 +384,11 @@ func (h *requestHandler) call(api *apiSettings, src, dst interface{}) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), authAPITimeout)
-	resp, err := ctxhttp.Do(ctx, nil, req)
+	// ctx, cancel := context.WithTimeout(context.TODO(), authAPITimeout)
+	client := urlfetch.Client(ctx)
+	resp, err := ctxhttp.Do(ctx, client, req)
 	if err != nil {
-		cancel()
+		// cancel()
 		return err
 	}
 	defer resp.Body.Close()

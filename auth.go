@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sync"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
 
@@ -91,56 +92,56 @@ func (a *Auth) VerifyIDTokenWithTransport(tokenString string, transport http.Rou
 
 // GetUser looks up the user identified by the provided user id and
 // returns a user record for the given user if that user is found.
-func (auth *Auth) GetUser(uid string) (*UserRecord, error) {
-	if err := ensureTokenSource(auth); err != nil {
+func (auth *Auth) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+	if err := ensureTokenSource(ctx, auth); err != nil {
 		return nil, err
 	}
 	handler := &requestHandler{ts: auth.ts}
-	return handler.getAccountByUID(uid)
+	return handler.getAccountByUID(ctx, uid)
 }
 
 // GetUserByEmail looks up the user identified by the provided email and
 // returns a user record for the given user if that user is found.
-func (auth *Auth) GetUserByEmail(email string) (*UserRecord, error) {
-	if err := ensureTokenSource(auth); err != nil {
+func (auth *Auth) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+	if err := ensureTokenSource(ctx, auth); err != nil {
 		return nil, err
 	}
 	handler := &requestHandler{ts: auth.ts}
-	return handler.getAccountByEmail(email)
+	return handler.getAccountByEmail(ctx, email)
 }
 
 // CreateUser creates a new user with the properties provided.
-func (auth *Auth) CreateUser(properties UserProperties) (*UserRecord, error) {
-	if err := ensureTokenSource(auth); err != nil {
+func (auth *Auth) CreateUser(ctx context.Context, properties UserProperties) (*UserRecord, error) {
+	if err := ensureTokenSource(ctx, auth); err != nil {
 		return nil, err
 	}
 	handler := &requestHandler{ts: auth.ts}
-	uid, err := handler.createNewAccount(properties)
+	uid, err := handler.createNewAccount(ctx, properties)
 	if err != nil {
 		return nil, err
 	}
-	return handler.getAccountByUID(uid)
+	return handler.getAccountByUID(ctx, uid)
 }
 
 // DeleteUser deletes the user identified by the provided user id and returns
 // nil error when the user is found and successfully deleted.
-func (auth *Auth) DeleteUser(uid string) error {
-	if err := ensureTokenSource(auth); err != nil {
+func (auth *Auth) DeleteUser(ctx context.Context, uid string) error {
+	if err := ensureTokenSource(ctx, auth); err != nil {
 		return err
 	}
 	handler := &requestHandler{ts: auth.ts}
-	return handler.deleteAccount(uid)
+	return handler.deleteAccount(ctx, uid)
 }
 
 // UpdateUser updates an existing user with the properties provided.
-func (auth *Auth) UpdateUser(uid string, properties UserProperties) (*UserRecord, error) {
-	if err := ensureTokenSource(auth); err != nil {
+func (auth *Auth) UpdateUser(ctx context.Context, uid string, properties UserProperties) (*UserRecord, error) {
+	if err := ensureTokenSource(ctx, auth); err != nil {
 		return nil, err
 	}
 	handler := &requestHandler{ts: auth.ts}
-	uid, err := handler.updateExistingAccount(uid, properties)
+	uid, err := handler.updateExistingAccount(ctx, uid, properties)
 	if err != nil {
 		return nil, err
 	}
-	return handler.getAccountByUID(uid)
+	return handler.getAccountByUID(ctx, uid)
 }

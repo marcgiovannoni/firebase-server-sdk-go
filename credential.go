@@ -70,7 +70,7 @@ var (
 	}
 )
 
-func ensureTokenSource(auth *Auth) error {
+func ensureTokenSource(context context.Context, auth *Auth) error {
 	if auth.ts != nil {
 		return nil
 	}
@@ -85,6 +85,6 @@ func ensureTokenSource(auth *Auth) error {
 		Scopes:     append([]string{}, scopes...),
 		TokenURL:   jwtTokenURL,
 	}
-	auth.ts = cfg.TokenSource(context.TODO())
+	auth.ts = cfg.TokenSource(context)
 	return nil
 }
